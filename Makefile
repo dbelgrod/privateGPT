@@ -33,7 +33,7 @@ check:
 ########################################################################################################################
 
 run:
-	poetry run python -m private_gpt
+	python3.11 -m poetry run python -m private_gpt
 
 dev-windows:
 	(set PGPT_PROFILES=local & poetry run python -m uvicorn private_gpt.main:app --reload --port 8001)
@@ -49,13 +49,13 @@ api-docs:
 	PGPT_PROFILES=mock poetry run python scripts/extract_openapi.py private_gpt.main:app --out fern/openapi/openapi.json
 
 ingest:
-	@poetry run python scripts/ingest_folder.py $(call args)
+	@python3.11 -m poetry run python scripts/ingest_folder.py $(call args)
 
 wipe:
-	poetry run python scripts/utils.py wipe
+	python3.11 -m poetry run python scripts/utils.py wipe
 
 setup:
-	poetry run python scripts/setup
+	python3.11 -m poetry run python scripts/setup
 
 list:
 	@echo "Available commands:"
