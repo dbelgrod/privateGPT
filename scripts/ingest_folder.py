@@ -2,6 +2,7 @@
 
 import argparse
 import logging
+import fnmatch
 from pathlib import Path
 
 from private_gpt.di import global_injector
@@ -20,20 +21,24 @@ class LocalIngestWorker:
 
         self._files_under_root_folder: list[Path] = list()
 
-    def _find_all_files_in_folder(self, root_path: Path, ignored: list[str]) -> None:
+    def _find_all_files_in_folder(self, root_path: Path, include: list[str], ignored: list[str]) -> None:
         """Search all files under the root folder recursively.
         Count them at the same time
         """
         for file_path in root_path.iterdir():
-            if file_path.is_file() and file_path.name not in ignored:
+            if any(fnmatch.fnmatch(file_path.name, pattern) for pattern in ignored):
+                continue
+            if file_path.is_file() and include and not any(fnmatch.fnmatch(file_path.name, pattern) for pattern in include):
+                continue
+            if file_path.is_file():
                 self.total_documents += 1
                 self._files_under_root_folder.append(file_path)
-            elif file_path.is_dir() and file_path.name not in ignored:
-                self._find_all_files_in_folder(file_path, ignored)
+            elif file_path.is_dir():
+                self._find_all_files_in_folder(file_path, include, ignored)
 
-    def ingest_folder(self, folder_path: Path, ignored: list[str]) -> None:
+    def ingest_folder(self, folder_path: Path, include: list[str], ignored: list[str]) -> None:
         # Count total documents before ingestion
-        self._find_all_files_in_folder(folder_path, ignored)
+        self._find_all_files_in_folder(folder_path, include, ignored)
         self._ingest_all(self._files_under_root_folder)
 
     def _ingest_all(self, files_to_ingest: list[Path]) -> None:
@@ -76,6 +81,12 @@ parser.add_argument(
     type=str,
     default=None,
 )
+parser.add_argument(
+    "--include",
+    nargs="*",
+    help="List of files/directories to only include",
+    default=[],
+)
 
 args = parser.parse_args()
 
@@ -98,7 +109,10 @@ if __name__ == "__main__":
 
     ingest_service = global_injector.get(IngestService)
     worker = LocalIngestWorker(ingest_service)
-    worker.ingest_folder(root_path, args.ignored)
+    worker.ingest_folder(root_path, args.include, args.ignored)
+    
+    if args.include:
+        logger.info(f"Only ingesting files: {args.include}")
 
     if args.ignored:
         logger.info(f"Skipping following files and directories: {args.ignored}")
